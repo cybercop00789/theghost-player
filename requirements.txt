@@ -1,7 +1,5 @@
-flask
-flask-cors
-gunicorn
-uvicorn
-a2wsgi
+Flask
+Flask-Cors
 yt-dlp
+gunicorn
 requests

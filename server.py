@@ -1,3 +1,4 @@
+import os
 import re
 import time
 import threading
@@ -354,5 +355,6 @@ def get_info():
 def health():
  return jsonify({"ok":True,"channel":CHANNEL_ID,"playlist":UPLOADS_PLAYLIST,"cached":len(playlist_cache["entries"])})
 if __name__=='__main__':
- print("🚀 http://localhost:8000/index.html"); print(f"   {CHANNEL_ID} -> {UPLOADS_PLAYLIST}")
- app.run(host='0.0.0.0',port=8000,debug=False,threaded=True)
+ port=int(os.environ.get('PORT', 7860))
+ print(f"🚀 http://localhost:{port}/index.html"); print(f"   {CHANNEL_ID} -> {UPLOADS_PLAYLIST} (PORT={port})")
+ app.run(host='0.0.0.0',port=port,debug=False,threaded=True)
