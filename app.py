@@ -1,10 +1,14 @@
 import os
-import spaces
+from flask import send_file
 import gradio as gr
+from server import app as flask_app
 
-@spaces.GPU
-def init_gpu(x):
-    return x
+@flask_app.route('/')
+def index():
+    return send_file('index.html')
 
-init_gpu(1)
-os.system("gunicorn -b 0.0.0.0:7860 server:app")
+app = gr.mount_gradio_app(flask_app, gr.Blocks(), path='/gradio')
+
+if __name__ == '__main__':
+    import uvicorn
+    uvicorn.run('app:app', host='0.0.0.0', port=7860)
