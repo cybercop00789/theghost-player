@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Ghost Radio - โหมดเสียงประหยัดเน็ต</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#020617;--panel:#0f172a;--elev:#1e293b;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#f8fafc;--muted:#94a3b8;--accent:#f59e0b;--accent2:#fbbf24}
+body{background:#020617;color:#f8fafc;font-family:'Inter',system-ui,-apple-system,sans-serif;padding:20px;min-height:100vh}
+.container{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{border-bottom:1px solid #1e293b;padding-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{color:#f59e0b;font-size:1.5rem;font-weight:700;letter-spacing:-0.02em}
+.badge-data{background:#059669;color:#ecfdf5;font-size:0.72rem;padding:4px 10px;border-radius:999px;font-weight:700}
+.card{background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:14px}
+.filter-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+select{background:#020617;border:1px solid #334155;border-radius:8px;color:#f8fafc;padding:8px 12px;font-size:0.85rem;outline:none}
+button{cursor:pointer;border:none;border-radius:8px;font-weight:600;transition:0.2s}
+.btn-main{background:#f59e0b;color:#020617;padding:8px 16px;font-size:0.85rem}
+.btn-main:hover{background:#fbbf24}
+.btn-main:disabled{opacity:0.5;cursor:not-allowed}
+.ep-slider{display:flex;gap:12px;overflow-x:auto;padding:10px 0;margin-top:10px;scrollbar-width:thin}
+.ep-card{min-width:230px;max-width:230px;background:#020617;border:1px solid #1e293b;border-radius:8px;overflow:hidden;cursor:pointer;transition:0.2s;flex-shrink:0}
+.ep-card:hover,.ep-card.active{border-color:#f59e0b;transform:translateY(-2px)}
+.ep-card img{width:100%;aspect-ratio:16/9;object-fit:cover}
+.ep-card-info{padding:8px 10px;font-size:0.75rem}
+.ep-card-title{color:#f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.ep-card-date{color:#f59e0b;font-size:0.72rem;margin-top:4px;font-family:'JetBrains Mono',monospace}
+.grid{display:grid;grid-template-columns:1.3fr 0.9fr;gap:16px;margin-top:6px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+@media(max-width:640px){
+  body{padding:12px}
+  h1{font-size:1.15rem}
+  .container{gap:12px}
+  .filter-row{gap:8px}
+  .filter-row label{width:100%}
+  .filter-row select{flex:1; min-width:0}
+  .sleep-box{margin-left:0;width:100%;justify-content:space-between}
+  .ep-card{min-width:180px;max-width:180px}
+  .ep-card img{aspect-ratio:16/10}
+  .audio-player-box{padding:20px 14px 14px;min-height:360px;gap:12px}
+  .radio-disc{width:120px;height:120px;border-width:3px}
+  .disc-center{width:34px;height:34px}
+  #epTitle{font-size:0.9rem}
+  #epSub{font-size:0.78rem}
+  #chapterTitle{font-size:0.82rem}
+  .ctrl-bar{padding:6px 8px;gap:8px}
+  .ctrl-btn{width:42px;height:42px;font-size:15px}
+  .icon-btn{width:36px;height:36px}
+  #timeDisplay{font-size:0.72rem;min-width:80px}
+  .progress-wrap{height:22px}
+  .progress-track{height:5px}
+  .progress-handle{width:14px;height:14px;opacity:1}
+  .playlist-card{height:420px;padding:12px}
+  .item{padding:9px 10px}
+  .btn-play{padding:8px 12px;min-height:36px}
+}
+@media(max-width:380px){
+  h1{font-size:1rem}
+  .ep-card{min-width:160px;max-width:160px}
+  .radio-disc{width:108px;height:108px}
+  .ctrl-bar{gap:6px}
+  #timeDisplay{font-size:0.68rem;min-width:72px}
+}
+@media(min-width:641px) and (max-width:900px){
+  .audio-player-box{min-height:380px}
+}
+@media(prefers-reduced-motion:reduce){ .radio-disc{animation:none !important} }
+/* Modern player card matching screenshot */
+.audio-player-box{background:radial-gradient(ellipse at center top,#1e293b 0%,#0f172a 35%,#020617 70%);border:1px solid #1e293b;border-radius:16px;padding:28px 20px 18px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;min-height:420px;position:relative;overflow:hidden}
+.audio-player-box::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(245,158,11,0.06),transparent 40%);pointer-events:none}
+.radio-disc{width:148px;height:148px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#475569 0%,#334155 18%,#0f172a 45%,#020617 75%);border:4px solid #f59e0b;display:flex;align-items:center;justify-content:center;box-shadow:0 0 28px rgba(245,158,11,0.28), inset 0 0 20px rgba(0,0,0,0.6);animation:spin 10s linear infinite;animation-play-state:paused;position:relative;z-index:1}
+.radio-disc.playing{animation-play-state:running}
+@keyframes spin{100%{transform:rotate(360deg)}}
+.disc-center{width:42px;height:42px;border-radius:50%;background:#0f172a;border:2px solid #64748b;box-shadow:inset 0 0 8px rgba(0,0,0,0.8)}
+.player-text{position:relative;z-index:1;width:100%}
+#epTitle{font-size:0.95rem;color:#f8fafc;font-weight:600;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#epSub{font-size:0.82rem;color:#cbd5e1;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#chapterTitle{font-size:0.88rem;color:#f59e0b;font-weight:700;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctrl-bar{width:100%;background:#1a1d24;border:1px solid rgba(255,255,255,0.08);border-radius:999px;padding:8px 12px;display:flex;align-items:center;gap:10px;position:relative;z-index:1;margin-top:6px}
+.ctrl-btn{width:36px;height:36px;border-radius:50%;background:#fff;color:#111;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;border:none}
+.ctrl-btn:hover{transform:scale(1.05)}
+#timeDisplay{font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:#f8fafc;white-space:nowrap;min-width:92px;text-align:center}
+.progress-wrap{flex:1;position:relative;height:18px;display:flex;align-items:center;cursor:pointer}
+.progress-track{width:100%;height:4px;background:#3a3f4a;border-radius:999px;overflow:hidden;position:relative}
+.progress-fill{height:100%;background:#fff;width:0%;border-radius:999px;transition:width 0.1s linear}
+.progress-handle{position:absolute;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;background:#fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4);opacity:0;transition:opacity 0.15s;pointer-events:none}
+.progress-wrap:hover .progress-handle{opacity:1}
+.icon-btn{width:32px;height:32px;border-radius:50%;background:transparent;color:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;border:1px solid transparent}
+.icon-btn:hover{background:rgba(255,255,255,0.08)}
+.scrub-tooltip{position:absolute;bottom:28px;transform:translateX(-50%);background:#0f172a;color:#f8fafc;font-family:'JetBrains Mono',monospace;font-size:0.7rem;padding:4px 7px;border-radius:6px;border:1px solid #334155;pointer-events:none;opacity:0;transition:opacity 0.12s;white-space:nowrap;z-index:5}
+.scrub-tooltip.show{opacity:1}
+audio{width:100%;display:none}
+.playlist-card{background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:16px;display:flex;flex-direction:column;height:560px}
+.playlist-title{font-size:0.95rem;font-weight:700;border-bottom:1px solid #1e293b;padding-bottom:10px;margin-bottom:10px;color:#cbd5e1;display:flex;justify-content:space-between}
+.playlist-items{overflow-y:auto;display:flex;flex-direction:column;gap:8px;flex:1;padding-right:4px}
+.item{background:#020617;border:1px solid #1e293b;border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:0.82rem;transition:0.2s}
+.item:hover{border-color:#f59e0b;background:#090d16}
+.item.active{border-color:#f59e0b;background:#1a233a}
+.item-left{display:flex;flex-direction:column;gap:2px;overflow:hidden;margin-right:8px}
+.item-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#f1f5f9;font-weight:500}
+.item-meta{font-size:0.72rem;color:#94a3b8;font-family:'JetBrains Mono',monospace;display:flex;gap:8px}
+.time-tag{color:#f59e0b}
+.dur-tag{color:#38bdf8}
+.btn-play{background:#1e293b;color:#f8fafc;padding:6px 10px;font-size:0.75rem;border-radius:6px;flex-shrink:0}
+.item:hover .btn-play{background:#f59e0b;color:#020617}
+.empty{color:#64748b;font-size:0.85rem;text-align:center;margin-top:60px;padding:20px}
+.sleep-box{display:flex;gap:8px;align-items:center;margin-left:auto;background:#020617;border:1px solid #334155;border-radius:8px;padding:6px 10px}
+.sleep-box select{padding:6px 8px;font-size:0.8rem}
+#sleepCountdown{font-family:'JetBrains Mono',monospace;color:#f59e0b;font-weight:700;font-size:0.85rem}
+#btnSleepCancel{background:#334155;color:#f8fafc;padding:4px 10px;font-size:0.75rem}
+/* Keep playing in background: ensure audio not throttled by hidden tab styles */
+html,body{overscroll-behavior:none}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<div><h1>THE GHOST RADIO (AUDIO ONLY)</h1><p style="font-size:0.8rem;color:#94a3b8;">โหมดฟังเสียงล้วน ไม่โหลดวิดีโอ ประหยัดเน็ตสูงสุด</p></div>
+<span class="badge-data">⚡ ประหยัดเน็ต 90%</span>
+</header>
+<div class="card">
+<div class="filter-row">
+<label style="font-size:0.85rem;color:#cbd5e1;">เลือกเดือน:</label>
+<select id="selectMonth"><option value="1">มกราคม</option><option value="2">กุมภาพันธ์</option><option value="3">มีนาคม</option><option value="4">เมษายน</option><option value="5">พฤษภาคม</option><option value="6">มิถุนายน</option><option value="7">กรกฎาคม</option><option value="8">สิงหาคม</option><option value="9">กันยายน</option><option value="10" selected>ตุลาคม</option><option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option></select>
+<select id="selectYear"><option value="2026" selected>2569 (2026)</option></select>
+<select id="selectSort"><option value="asc" selected>ต้นเดือน ➔ ท้ายเดือน</option><option value="desc">ล่าสุด ➔ ต้นเดือน</option></select>
+<button id="btnSearchMonth" class="btn-main">ค้นหาคลิป</button>
+<div class="sleep-box" id="sleepBox"><span style="font-size:0.8rem;color:#cbd5e1;">⏰ ปิดอัตโนมัติ:</span><select id="sleepTimer"><option value="0" selected>ไม่ปิด</option><option value="0.5">30 นาที</option><option value="1">1 ชม</option><option value="1.5">1.5 ชม</option><option value="2">2 ชม</option><option value="3">3 ชม</option><option value="4">4 ชม</option><option value="6">6 ชม</option><option value="8">8 ชม</option><option value="12">12 ชม</option></select><span id="sleepCountdown" style="display:none;"></span><button id="btnSleepCancel" style="display:none;">ยกเลิก</button></div>
+</div>
+<div id="epSlider" class="ep-slider"><div style="font-size:0.8rem;color:#64748b;padding:12px 0;">กดปุ่มเพื่อดึงคลิป</div></div>
+</div>
+<div class="grid">
+<div class="audio-player-box">
+<div id="disc" class="radio-disc"><div class="disc-center"></div></div>
+<div class="player-text">
+<h3 id="epTitle">ยังไม่ได้เลือกคลิป</h3>
+<p id="epSub">TheGhostRadio เรื่องเล่าผีเดอะโกส</p>
+<p id="chapterTitle">เลือกตอนด้านขวาเพื่อเริ่มฟัง</p>
+</div>
+<div class="ctrl-bar" id="ctrlBar">
+<button class="ctrl-btn" id="btnPlayPause" title="เล่น/หยุด">▶</button>
+<span id="timeDisplay">0:00 / 0:00</span>
+<div class="progress-wrap" id="progressWrap">
+<div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+<div class="progress-handle" id="progressHandle"></div>
+<div class="scrub-tooltip" id="scrubTip">0:00</div>
+</div>
+<button class="icon-btn" id="btnVolume" title="ปิดเสียง">🔊</button>
+<button class="icon-btn" id="btnMore" title="เมนู">⋮</button>
+</div>
+<audio id="audioEl" controls preload="metadata" playsinline webkit-playsinline x-webkit-airplay="allow"></audio>
+</div>
+<div class="playlist-card">
+<div class="playlist-title"><span>รายชื่อเรื่องย่อย</span><span id="badge" style="color:#f59e0b;font-family:'JetBrains Mono',monospace;">0 ตอน</span></div>
+<div id="playlist" class="playlist-items"><div class="empty">คลิกเลือกคลิปด้านบนเพื่อโหลดตอนย่อย</div></div>
+</div>
+</div>
+</div>
+<script>
+const audioEl=document.getElementById('audioEl');
+audioEl.setAttribute('playsinline','');
+audioEl.setAttribute('webkit-playsinline','');
+try{ audioEl.preload='auto'; }catch(e){}
+const disc=document.getElementById('disc');
+// Wake Lock to prevent screen lock pause (like Pure Tuber)
+let wakeLock=null;
+async function requestWakeLock(){
+  try{
+    if('wakeLock' in navigator){ wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>{}); }
+  }catch(e){}
+}
+function releaseWakeLock(){ try{ if(wakeLock){ wakeLock.release(); wakeLock=null; } }catch(e){} }
+document.addEventListener('visibilitychange',()=>{
+  // Keep audio playing when tab hidden / minimized / lock screen — do NOT pause
+  if(document.visibilityState==='hidden'){
+    // re-request wake lock when visible again
+  } else {
+    if(!audioEl.paused) requestWakeLock();
+  }
+});
+// Unlock autoplay on first user gesture (required for background playback on mobile)
+let audioUnlocked=false;
+function unlockAudio(){
+  if(audioUnlocked) return;
+  audioUnlocked=true;
+  // Create silent buffer to unlock audio context
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    if(ctx.state==='suspended') ctx.resume();
+  }catch(e){}
+  document.removeEventListener('click', unlockAudio);
+  document.removeEventListener('touchstart', unlockAudio);
+}
+document.addEventListener('click', unlockAudio, {once:true});
+document.addEventListener('touchstart', unlockAudio, {once:true, passive:true});
+// Media Session (lock screen / notification controls like Pure Tuber)
+function updateMediaSession(title, artist){
+  if(!('mediaSession' in navigator)) return;
+  try{
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: title || document.getElementById('epTitle').innerText || 'The Ghost Radio',
+      artist: artist || 'The Ghost Radio',
+      album: 'ฟังย้อนหลัง',
+      artwork: [{src: 'https://i.ytimg.com/vi/'+(window._currentThumb||'7GgcA4YESp4')+'/hqdefault.jpg', sizes:'480x360', type:'image/jpeg'}]
+    });
+    navigator.mediaSession.setActionHandler('play', ()=> audioEl.play().catch(()=>{}));
+    navigator.mediaSession.setActionHandler('pause', ()=> audioEl.pause());
+    navigator.mediaSession.setActionHandler('seekbackward', (d)=>{ audioEl.currentTime = Math.max(0, audioEl.currentTime - (d.seekOffset||10)); });
+    navigator.mediaSession.setActionHandler('seekforward', (d)=>{ audioEl.currentTime = Math.min(audioEl.duration||1e9, audioEl.currentTime + (d.seekOffset||10)); });
+    try{ navigator.mediaSession.setActionHandler('seekto', (d)=>{ if(d.seekTime!=null) audioEl.currentTime=d.seekTime; }); }catch(e){}
+    try{ navigator.mediaSession.setActionHandler('stop', ()=> audioEl.pause()); }catch(e){}
+  }catch(e){}
+}
+let _currentThumb='';
+const btnPlayPause=document.getElementById('btnPlayPause');
+const timeDisplay=document.getElementById('timeDisplay');
+const progressWrap=document.getElementById('progressWrap');
+const progressFill=document.getElementById('progressFill');
+const progressHandle=document.getElementById('progressHandle');
+const scrubTip=document.getElementById('scrubTip');
+const btnVolume=document.getElementById('btnVolume');
+
+function fmt(t){ if(isNaN(t)||!isFinite(t)) return '0:00'; t=Math.floor(t); const h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60; if(h>0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; return `${m}:${String(s).padStart(2,'0')}` }
+
+audioEl.onplay=()=>{disc.classList.add('playing');btnPlayPause.textContent='⏸';requestWakeLock();if('mediaSession' in navigator) try{navigator.mediaSession.playbackState='playing';}catch(e){}}
+audioEl.onpause=()=>{disc.classList.remove('playing');btnPlayPause.textContent='▶';releaseWakeLock();if('mediaSession' in navigator) try{navigator.mediaSession.playbackState='paused';}catch(e){}}
+audioEl.onended=()=>{btnPlayPause.textContent='▶';disc.classList.remove('playing');releaseWakeLock();if('mediaSession' in navigator) try{navigator.mediaSession.playbackState='none';}catch(e){}}
+audioEl.addEventListener('timeupdate',()=>{
+  const cur=audioEl.currentTime||0, dur=audioEl.duration||0;
+  timeDisplay.textContent=`${fmt(cur)} / ${fmt(dur)}`;
+  const pct=dur? (cur/dur*100):0;
+  progressFill.style.width=pct+'%';
+  progressHandle.style.left=pct+'%';
+  progressHandle.style.opacity='1';
+  if('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession){
+    try{
+      const d=audioEl.duration, c=audioEl.currentTime;
+      if(isFinite(d) && d>0) navigator.mediaSession.setPositionState({duration:d, playbackRate: audioEl.playbackRate||1, position: Math.max(0,Math.min(c,d))});
+    }catch(e){}
+  }
+});
+audioEl.addEventListener('loadedmetadata',()=>{
+  timeDisplay.textContent=`${fmt(audioEl.currentTime)} / ${fmt(audioEl.duration)}`;
+});
+btnPlayPause.onclick=()=>{
+  if(!audioEl.src) return;
+  if(audioEl.paused) audioEl.play().catch(()=>{}); else audioEl.pause();
+};
+let isDragging=false;
+function seekFromEvent(e){
+  const rect=progressWrap.getBoundingClientRect();
+  const x=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+  const pct=Math.max(0,Math.min(1,x/rect.width));
+  const dur=audioEl.duration||0;
+  return {pct,time:pct*dur};
+}
+progressWrap.addEventListener('mousedown',e=>{isDragging=true; const {time}=seekFromEvent(e); if(isFinite(time)) audioEl.currentTime=time;});
+window.addEventListener('mouseup',()=>{isDragging=false;});
+window.addEventListener('mousemove',e=>{
+  if(isDragging && e.buttons===1){
+    const {time}=seekFromEvent(e);
+    if(isFinite(time)) audioEl.currentTime=time;
+  }
+});
+progressWrap.addEventListener('touchstart',e=>{isDragging=true; const {time}=seekFromEvent(e); if(isFinite(time)) audioEl.currentTime=time;},{passive:true});
+progressWrap.addEventListener('touchmove',e=>{ if(isDragging){ const {time}=seekFromEvent(e); if(isFinite(time)) audioEl.currentTime=time;}},{passive:true});
+progressWrap.addEventListener('touchend',()=>{isDragging=false;});
+progressWrap.addEventListener('mousemove',e=>{
+  const {time,pct}=seekFromEvent(e);
+  scrubTip.textContent=fmt(time);
+  scrubTip.style.left=(pct*100)+'%';
+  scrubTip.classList.add('show');
+});
+progressWrap.addEventListener('mouseleave',()=>scrubTip.classList.remove('show'));
+progressWrap.addEventListener('click',e=>{
+  if(isDragging) return;
+  const {time}=seekFromEvent(e);
+  if(isFinite(time)) audioEl.currentTime=time;
+});
+let prevVol=1;
+btnVolume.onclick=()=>{
+  if(audioEl.muted || audioEl.volume===0){ audioEl.muted=false; audioEl.volume=prevVol||0.9; btnVolume.textContent='🔊'; }
+  else { prevVol=audioEl.volume; audioEl.muted=true; btnVolume.textContent='🔇'; }
+};
+document.getElementById('btnMore').onclick=()=>{
+  if(!audioEl.src) return;
+  if(navigator.clipboard) navigator.clipboard.writeText(audioEl.src).then(()=>{ const t=document.getElementById('chapterTitle'); const old=t.innerText; t.innerText='คัดลอกลิงก์เสียงแล้ว ✓'; setTimeout(()=>t.innerText=old,1500);});
+};
+
+function playChapterAt(seconds,titleText){
+  if(!audioEl.src) return;
+  audioEl.currentTime=seconds;
+  audioEl.play().catch(()=>{});
+  document.getElementById('chapterTitle').innerText=titleText;
+  document.getElementById('epSub').innerText=titleText;
+  updateMediaSession(titleText, 'The Ghost Radio');
+}
+function renderChapters(chapters){
+  const container=document.getElementById('playlist');
+  const badge=document.getElementById('badge');
+  container.innerHTML='';
+  badge.innerText=`${chapters.length} ตอน`;
+  if(!chapters.length){
+    container.innerHTML='<div class="empty">ไม่พบตอนย่อยในคลิปนี้</div>';
+    return;
+  }
+  chapters.forEach((ch,idx)=>{
+    const div=document.createElement('div');
+    div.className="item";
+    div.innerHTML=`<div class="item-left"><span class="item-title">${idx+1}. ${ch.title}</span><div class="item-meta"><span class="time-tag">เริ่ม ${ch.rawTime}</span><span class="dur-tag">⏱ ${ch.duration}</span></div></div><button class="btn-play">ฟัง</button>`;
+    div.onclick=()=>{
+      document.querySelectorAll('.item').forEach(el=>el.classList.remove('active'));
+      div.classList.add('active');
+      playChapterAt(ch.time, `${idx+1}. ${ch.title} (${ch.duration})`);
+    };
+    container.appendChild(div);
+  });
+  const stories=window._lastStories||[];
+  if(stories.length && chapters.length===1 && chapters[0].title.includes('ฟังเต็มรายการ')){
+    const box=document.createElement('div');
+    box.style.cssText='margin-top:10px;padding:10px;background:#020617;border:1px dashed #334155;border-radius:8px;';
+    box.innerHTML='<div style="font-size:0.75rem;color:#f59e0b;font-weight:bold;margin-bottom:6px;">📖 เรื่องในคืนนี้ ('+stories.length+' เรื่อง):</div>' + stories.map((t,i)=>`<div style="font-size:0.78rem;color:#cbd5e1;padding:3px 0;border-bottom:1px solid #1e293b;">${i+1}. ${t}</div>`).join('');
+    container.appendChild(box);
+  }
+}
+const infoCache=new Map();
+let currentVideoId=null;
+async function loadEpisode(videoId,title){
+  currentVideoId=videoId;
+  document.getElementById('epTitle').innerText=title;
+  document.getElementById('epSub').innerText='TheGhostRadio เรื่องเล่าผีเดอะโกส';
+  audioEl.pause();
+  audioEl.removeAttribute('src');
+  audioEl.load();
+  timeDisplay.textContent='0:00 / 0:00';
+  progressFill.style.width='0%';
+  document.getElementById('chapterTitle').innerText='กำลังเชื่อมต่อสัญญาณเสียง...';
+  const playlist=document.getElementById('playlist');
+  playlist.innerHTML='<div class="empty">กำลังดึงเสียง...</div>';
+  if(infoCache.has(videoId)){
+    const c=infoCache.get(videoId);
+    audioEl.src=c.audioUrl;
+    audioEl.load();
+    audioEl.play().catch(()=>{});
+    document.getElementById('chapterTitle').innerText='พร้อมฟัง (จาก cache) ▶ เริ่มเล่นทันที';
+    window._lastStories=c.storyNames||[];
+    renderChapters(c.chapters||[]);
+    return;
+  }
+  try{
+    const t0=performance.now();
+    const res=await fetch('/api/get-info',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:videoId})});
+    const data=await res.json();
+    const ms=Math.round(performance.now()-t0);
+    infoCache.set(videoId,data);
+    window._lastStories=data.storyNames||[];
+    if(currentVideoId!==videoId) return;
+    if(data.audioUrl){
+      audioEl.src=data.audioUrl;
+      audioEl.load();
+      audioEl.play().catch(()=>{});
+      document.getElementById('chapterTitle').innerText=`▶ กำลังเล่น · ${data.title||title} (${ms}ms) — เลื่อนแถบเพื่อดูเวลาได้`;
+      _currentThumb = data.thumbnail || window._eps?.find(e=>e.videoId===videoId)?.thumbnail || '7GgcA4YESp4';
+      updateMediaSession(data.title||title, 'The Ghost Radio');
+      try{ if('mediaSession' in navigator) navigator.mediaSession.playbackState='playing'; }catch(e){}
+    } else {
+      document.getElementById('chapterTitle').innerText='ไม่สามารถดึงเสียงได้';
+    }
+    renderChapters(data.chapters||[]);
+    const idx=window._eps?window._eps.findIndex(e=>e.videoId===videoId):-1;
+    if(idx>=0 && window._eps[idx+1]){
+      const nid=window._eps[idx+1].videoId;
+      if(!infoCache.has(nid)) fetch('/api/get-info',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:nid})}).then(r=>r.json()).then(d=>infoCache.set(nid,d)).catch(()=>{});
+    }
+  }catch(err){
+    playlist.innerHTML='<div class="empty">โหลดข้อมูลไม่สำเร็จ</div>';
+  }
+}
+document.getElementById('btnSearchMonth').addEventListener('click',async()=>{
+  const month=document.getElementById('selectMonth').value;
+  const year=document.getElementById('selectYear').value;
+  const sort=document.getElementById('selectSort').value;
+  const slider=document.getElementById('epSlider');
+  const btn=document.getElementById('btnSearchMonth');
+  btn.disabled=true;
+  btn.innerText='กำลังค้นหา...';
+  slider.innerHTML='<div style="font-size:0.8rem;color:#94a3b8;padding:12px 0;">กำลังดึงคลิปของ The Ghost Radio... (เดือนเก่าอาจใช้เวลา 15-30 วินาที)</div>';
+  try{
+    const res=await fetch('/api/get-episodes-by-month',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({month:month,year:year,sort:sort})});
+    const data=await res.json();
+    slider.innerHTML='';
+    window._eps=data.episodes||[];
+    if(data.episodes && data.episodes.length>0){
+      document.getElementById('badge').innerText=data.episodes.length+' วัน';
+      data.episodes.forEach((ep,index)=>{
+        const card=document.createElement('div');
+        card.className='ep-card';
+        card.innerHTML=`<img src="${ep.thumbnail}" alt=""><div class="ep-card-info"><div class="ep-card-title">${ep.title}</div><div class="ep-card-date">📅 ${ep.publishedAt}</div></div>`;
+        card.onclick=()=>{
+          document.querySelectorAll('.ep-card').forEach(c=>c.classList.remove('active'));
+          card.classList.add('active');
+          loadEpisode(ep.videoId,ep.title);
+        };
+        slider.appendChild(card);
+        if(index===0){ card.classList.add('active'); loadEpisode(ep.videoId,ep.title); }
+      });
+    } else {
+      slider.innerHTML='<div style="font-size:0.8rem;color:#f87171;padding:12px 0;">ไม่พบคลิปรวม (ฟังย้อนหลัง/ฟังสด) ในเดือนนี้</div>';
+    }
+  }catch(err){
+    slider.innerHTML='<div style="font-size:0.8rem;color:#f87171;padding:12px 0;">เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ</div>';
+  }finally{
+    btn.disabled=false;
+    btn.innerText='ค้นหาคลิป';
+  }
+});
+let sleepTimeout=null,sleepInterval=null,sleepEndTs=0;
+function fmtHMS(sec){const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;if(h>0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;return `${m}:${String(s).padStart(2,'0')}`;}
+function clearSleep(){if(sleepTimeout){clearTimeout(sleepTimeout);sleepTimeout=null;}if(sleepInterval){clearInterval(sleepInterval);sleepInterval=null;}sleepEndTs=0;document.getElementById('sleepCountdown').style.display='none';document.getElementById('sleepCountdown').innerText='';document.getElementById('btnSleepCancel').style.display='none';document.getElementById('sleepTimer').value='0';}
+function startSleep(hours){clearSleep();if(!hours||hours<=0) return;const ms=hours*3600*1000;sleepEndTs=Date.now()+ms;document.getElementById('sleepCountdown').style.display='inline';document.getElementById('btnSleepCancel').style.display='inline';function tick(){const left=Math.max(0,Math.ceil((sleepEndTs-Date.now())/1000));document.getElementById('sleepCountdown').innerText='⏳ '+fmtHMS(left);if(left<=0){clearSleep();try{audioEl.pause();}catch(e){}document.getElementById('chapterTitle').innerText='⏰ ครบเวลาปิดอัตโนมัติ — หยุดเล่นแล้ว';setTimeout(()=>{try{window.close();}catch(e){}},2000);document.getElementById('disc').classList.remove('playing');}}tick();sleepInterval=setInterval(tick,1000);sleepTimeout=setTimeout(tick,ms);try{localStorage.setItem('ghost_sleep_h',String(hours));}catch(e){}}
+document.getElementById('sleepTimer').addEventListener('change',e=>{const v=parseFloat(e.target.value)||0;startSleep(v);});
+document.getElementById('btnSleepCancel').addEventListener('click',clearSleep);
+try{const sv=parseFloat(localStorage.getItem('ghost_sleep_h')||'0');if(sv>0){document.getElementById('sleepTimer').value=String(sv);startSleep(sv);}}catch(e){}
+window.addEventListener('DOMContentLoaded',()=>{document.getElementById('btnSearchMonth').click();});
+</script>
+</body>
+</html>
