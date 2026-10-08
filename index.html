@@ -151,6 +151,7 @@ html,body{overscroll-behavior:none}
 <button class="icon-btn" id="btnMore" title="เมนู">⋮</button>
 </div>
 <audio id="audioEl" controls preload="metadata" playsinline webkit-playsinline x-webkit-airplay="allow"></audio>
+<div style="margin-top:6px;display:flex;justify-content:center;width:100%;position:relative;z-index:1"><label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:#94a3b8;cursor:pointer;user-select:none"><input type="checkbox" id="chkAutoplay" checked style="accent-color:#f59e0b;width:14px;height:14px"> 🔁 เล่นต่อเนื่องอัตโนมัติ (จบแล้วต่อตอนถัดไป)</label></div>
 </div>
 <div class="playlist-card">
 <div class="playlist-title"><span>รายชื่อเรื่องย่อย</span><span id="badge" style="color:#f59e0b;font-family:'JetBrains Mono',monospace;">0 ตอน</span></div>
@@ -180,21 +181,26 @@ document.addEventListener('visibilitychange',()=>{
     if(!audioEl.paused) requestWakeLock();
   }
 });
-// Unlock autoplay on first user gesture (required for background playback on mobile)
+// Unlock autoplay lazily — only on actual play gesture, not on load
 let audioUnlocked=false;
 function unlockAudio(){
   if(audioUnlocked) return;
   audioUnlocked=true;
-  // Create silent buffer to unlock audio context
   try{
     const ctx = new (window.AudioContext||window.webkitAudioContext)();
-    if(ctx.state==='suspended') ctx.resume();
+    if(ctx && ctx.state==='suspended') ctx.resume().catch(()=>{});
   }catch(e){}
-  document.removeEventListener('click', unlockAudio);
-  document.removeEventListener('touchstart', unlockAudio);
 }
-document.addEventListener('click', unlockAudio, {once:true});
-document.addEventListener('touchstart', unlockAudio, {once:true, passive:true});
+function ensureUnlocked(){
+  if(!audioUnlocked){
+    // resume in same user gesture stack
+    try{
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      if(ctx && ctx.state==='suspended') ctx.resume().catch(()=>{});
+      audioUnlocked=true;
+    }catch(e){}
+  }
+}
 // Media Session (lock screen / notification controls like Pure Tuber)
 function updateMediaSession(title, artist){
   if(!('mediaSession' in navigator)) return;
@@ -226,7 +232,15 @@ function fmt(t){ if(isNaN(t)||!isFinite(t)) return '0:00'; t=Math.floor(t); cons
 
 audioEl.onplay=()=>{disc.classList.add('playing');btnPlayPause.textContent='⏸';requestWakeLock();if('mediaSession' in navigator) try{navigator.mediaSession.playbackState='playing';}catch(e){}}
 audioEl.onpause=()=>{disc.classList.remove('playing');btnPlayPause.textContent='▶';releaseWakeLock();if('mediaSession' in navigator) try{navigator.mediaSession.playbackState='paused';}catch(e){}}
-audioEl.onended=()=>{btnPlayPause.textContent='▶';disc.classList.remove('playing');releaseWakeLock();if('mediaSession' in navigator) try{navigator.mediaSession.playbackState='none';}catch(e){}}
+// autoplay next — ย้ายไปเล่นตอนถัดไปอัตโนมัติเมื่อจบ
+audioEl.onended=()=>{
+  btnPlayPause.textContent='▶';disc.classList.remove('playing');releaseWakeLock();
+  if('mediaSession' in navigator) try{navigator.mediaSession.playbackState='none';}catch(e){}
+  if(!isAutoplayOn()) return;
+  // จบไฟล์ทั้งคลิป -> ไปวิดีโอถัดไป (วันถัดไป)
+  if(playNextVideo(true)) return;
+  document.getElementById('chapterTitle').innerText='จบเพลย์ลิสต์แล้ว — ไม่มีตอนถัดไป';
+};
 audioEl.addEventListener('timeupdate',()=>{
   const cur=audioEl.currentTime||0, dur=audioEl.duration||0;
   timeDisplay.textContent=`${fmt(cur)} / ${fmt(dur)}`;
@@ -246,6 +260,7 @@ audioEl.addEventListener('loadedmetadata',()=>{
 });
 btnPlayPause.onclick=()=>{
   if(!audioEl.src) return;
+  ensureUnlocked();
   if(audioEl.paused) audioEl.play().catch(()=>{}); else audioEl.pause();
 };
 let isDragging=false;
@@ -289,10 +304,35 @@ document.getElementById('btnMore').onclick=()=>{
   if(navigator.clipboard) navigator.clipboard.writeText(audioEl.src).then(()=>{ const t=document.getElementById('chapterTitle'); const old=t.innerText; t.innerText='คัดลอกลิงก์เสียงแล้ว ✓'; setTimeout(()=>t.innerText=old,1500);});
 };
 
+// Suppress noisy extension errors (CloseDisplay.js Math bug)
+window.addEventListener('error',e=>{ if(e.message && e.message.includes('Math[')) e.preventDefault(); });
+window.addEventListener('unhandledrejection',e=>{ if(e.reason && String(e.reason).includes('Math[')) e.preventDefault(); });
+// 🔁 autoplay next helpers
+function isAutoplayOn(){ const el=document.getElementById('chkAutoplay'); return el?el.checked:true; }
+function playNextVideo(fromEnded){
+  try{
+    if(!window._eps || !window._eps.length || !currentVideoId) return false;
+    const idx=window._eps.findIndex(e=>e.videoId===currentVideoId);
+    if(idx<0 || idx+1>=window._eps.length) return false;
+    const next=window._eps[idx+1];
+    document.querySelectorAll('.ep-card').forEach(c=>c.classList.remove('active'));
+    const cards=document.querySelectorAll('.ep-card');
+    if(cards[idx+1]){ cards[idx+1].classList.add('active'); try{cards[idx+1].scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});}catch(e){} }
+    document.getElementById('chapterTitle').innerText='🔁 กำลังโหลดตอนถัดไป: '+(next.title||next.videoId);
+    loadEpisode(next.videoId,next.title);
+    return true;
+  }catch(e){ return false; }
+}
+try{
+  const _av=localStorage.getItem('ghost_autoplay');
+  if(_av!==null) document.getElementById('chkAutoplay').checked=_av==='1';
+  document.getElementById('chkAutoplay').addEventListener('change',e=>{ try{localStorage.setItem('ghost_autoplay', e.target.checked?'1':'0');}catch(e2){} });
+}catch(e){}
 function playChapterAt(seconds,titleText){
   if(!audioEl.src) return;
   audioEl.currentTime=seconds;
   audioEl.play().catch(()=>{});
+  ensureUnlocked();
   document.getElementById('chapterTitle').innerText=titleText;
   document.getElementById('epSub').innerText=titleText;
   updateMediaSession(titleText, 'The Ghost Radio');
@@ -311,6 +351,7 @@ function renderChapters(chapters){
     div.className="item";
     div.innerHTML=`<div class="item-left"><span class="item-title">${idx+1}. ${ch.title}</span><div class="item-meta"><span class="time-tag">เริ่ม ${ch.rawTime}</span><span class="dur-tag">⏱ ${ch.duration}</span></div></div><button class="btn-play">ฟัง</button>`;
     div.onclick=()=>{
+      ensureUnlocked();
       document.querySelectorAll('.item').forEach(el=>el.classList.remove('active'));
       div.classList.add('active');
       playChapterAt(ch.time, `${idx+1}. ${ch.title} (${ch.duration})`);
